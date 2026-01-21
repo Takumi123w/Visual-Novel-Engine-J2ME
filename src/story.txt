@@ -1,0 +1,25 @@
+TITLE: Aquwa Story
+STBG: school.jpeg
+BG: school.jpeg
+MUS: music.mid
+CH: char.png
+POS: FAR_LEFT
+NAME: Aquwa plushie
+TXT: I can't believe I'm late again.
+CH2: char2.png
+POS2: FAR_RIGHT
+NAME: Mr. Vedal Smith
+TXT: Aquwa, why are you late?
+CHOICE: Apologize|sorry, Make an excuse|not eat
+LABEL: sorry
+NAME: Aquwa plushie
+TXT: Sorry sir, it won't happen again.
+GOTO: end
+
+LABEL: not eat
+NAME: Aquwa plushie
+TXT: There was a... giant robot blocking the road? Then i need defeat it before go to here
+GOTO: end
+
+LABEL: end
+TXT: To be continued...
