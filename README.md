@@ -1,3 +1,5 @@
+Visual Novel Engine J2ME
+-
 Create you own game by edit this package
 Unpack and edit story.txt that script for this engine run your VN story
 
