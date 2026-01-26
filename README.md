@@ -47,4 +47,8 @@ MUS: music.mid
 
 STOPMUS: is stoping music
 
+WAIT: Delay script.txt action for time set
+
+ONLYTXT: Hide dialog box and only show dialog text
+
 Basically you can make VN game only with you phone
