@@ -4,22 +4,37 @@ BG: school.jpeg
 MUS: music.mid
 CH: char.png
 POS: FAR_LEFT
-NAME: Aquwa plushie
+NAME: Aquwa
 TXT: I can't believe I'm late again.
 CH2: char2.png
 POS2: FAR_RIGHT
-NAME: Mr. Vedal Smith
+NAME: Mr.Teacher
 TXT: Aquwa, why are you late?
 CHOICE: Apologize|sorry, Make an excuse|not eat
 LABEL: sorry
-NAME: Aquwa plushie
+NAME: Aquwa
 TXT: Sorry sir, it won't happen again.
 GOTO: end
 
 LABEL: not eat
-NAME: Aquwa plushie
+NAME: Aquwa
 TXT: There was a... giant robot blocking the road? Then i need defeat it before go to here
+CH2: char2_back.png
+NAME: Mr.Teacher
+TXT: That not excuse Aquwa
+FLIP2: H
+CH: char.png
+FLIP: H
+WAIT: 3000
+CH:
+CH2:
+BG: aquwa_atk.jpg
+NAME: Aquwa
+ONLYTXT: Are you challenge me?
+WAIT: 3000
+BG:
 GOTO: end
 
 LABEL: end
+NAME:
 TXT: To be continued...

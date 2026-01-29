@@ -14,6 +14,7 @@ public class VisualNovelMIDlet extends MIDlet {
     private VNEngineCanvas gameCanvas;
     private String gameTitle = "Visual Novel Engine";
     private String startBgName = "none";
+    boolean onlyTextMode = false;
 
     public VisualNovelMIDlet() {
         display = Display.getDisplay(this);
@@ -106,21 +107,41 @@ class ImageUtils {
     public static Image createScaledImage(Image src, int dstW, int dstH) {
         int srcW = src.getWidth();
         int srcH = src.getHeight();
+        
         if (srcW == dstW && srcH == dstH) return src;
 
-        Image tmp = Image.createImage(dstW, dstH);
-        int[] rawInput = new int[srcW];
-        int[] rawOutput = new int[dstW];
+        int ratioW = (dstW * 1000) / srcW;
+        int ratioH = (dstH * 1000) / srcH;
+        
+        int ratio = (ratioW > ratioH) ? ratioW : ratioH;
+        
+        int finalW = (srcW * ratio) / 1000;
+        int finalH = (srcH * ratio) / 1000;
 
-        for (int y = 0; y < dstH; y++) {
-            int srcY = (y * srcH) / dstH;
+        Image tmp = Image.createImage(dstW, dstH);
+        Graphics g = tmp.getGraphics();
+        
+        int offsetX = (dstW - finalW) / 2;
+        int offsetY = (dstH - finalH) / 2;
+
+        int[] rawInput = new int[srcW];
+        int[] rawOutput = new int[finalW];
+
+        Image scaledBuffer = Image.createImage(finalW, finalH);
+        Graphics bg = scaledBuffer.getGraphics();
+
+        for (int y = 0; y < finalH; y++) {
+            int srcY = (y * srcH) / finalH;
             src.getRGB(rawInput, 0, srcW, 0, srcY, srcW, 1);
-            for (int x = 0; x < dstW; x++) {
-                int srcX = (x * srcW) / dstW;
+            for (int x = 0; x < finalW; x++) {
+                int srcX = (x * srcW) / finalW;
                 rawOutput[x] = rawInput[srcX];
             }
-            tmp.getGraphics().drawRGB(rawOutput, 0, dstW, 0, y, dstW, 1, true);
+            bg.drawRGB(rawOutput, 0, finalW, 0, y, finalW, 1, true);
         }
+
+        g.drawImage(scaledBuffer, offsetX, offsetY, Graphics.TOP | Graphics.LEFT);
+        
         return tmp;
     }
 }
@@ -151,7 +172,7 @@ class StartMenuCanvas extends Canvas {
         }
     }
 
-    protected void paint(Graphics g) {
+protected void paint(Graphics g) {
         int w = getWidth();
         int h = getHeight();
 
@@ -164,30 +185,38 @@ class StartMenuCanvas extends Canvas {
 
         String title = midlet.getGameTitle();
         g.setFont(titleFont);
+        int titleY = h / 5;
+        
         g.setColor(0, 0, 0);
-        drawWrappedTitle(g, title, w / 2 + 1, 41, w);
+        drawWrappedTitle(g, title, w / 2 + 1, titleY + 1, w - 20);
         g.setColor(255, 255, 255);
-        drawWrappedTitle(g, title, w / 2, 40, w);
+        drawWrappedTitle(g, title, w / 2, titleY, w - 20);
 
         g.setFont(menuFont);
-        int startY = h / 2;
+        int itemHeight = menuFont.getHeight() + 10;
+        int totalMenuHeight = options.length * itemHeight;
+        int startY = (h * 2/3) - (totalMenuHeight / 2);
+
         for (int i = 0; i < options.length; i++) {
-            int itemY = startY + (i * 45);
+            int itemY = startY + (i * itemHeight);
+            int rectW = w * 3/4;
+            int rectX = (w - rectW) / 2;
+
             if (i == selectedIndex) {
                 g.setColor(50, 50, 150);
-                g.fillRect(20, itemY - 5, w - 40, 30);
+                g.fillRect(rectX, itemY - 2, rectW, itemHeight - 4);
                 g.setColor(255, 255, 0);
             } else {
-                g.setColor(0, 0, 0);
-                g.fillRect(40, itemY - 5, w - 80, 30);
+                g.setColor( 0, 0, 0 );
+                g.fillRect(rectX + 10, itemY - 2, rectW - 20, itemHeight - 4);
                 g.setColor(200, 200, 200);
             }
             g.drawString(options[i], w / 2, itemY, Graphics.TOP | Graphics.HCENTER);
         }
     }
 
-    private void drawWrappedTitle(Graphics g, String title, int x, int y, int w) {
-        if (titleFont.stringWidth(title) > w - 20) {
+private void drawWrappedTitle(Graphics g, String title, int x, int y, int maxW) {
+        if (titleFont.stringWidth(title) > maxW) {
             int spaceIdx = title.lastIndexOf(' ', title.length() / 2 + 2);
             if (spaceIdx != -1) {
                 g.drawString(title.substring(0, spaceIdx), x, y, Graphics.TOP | Graphics.HCENTER);
@@ -202,10 +231,13 @@ class StartMenuCanvas extends Canvas {
 
     protected void pointerPressed(int x, int y) {
         int h = getHeight();
-        int startY = h / 2;
+        int itemHeight = menuFont.getHeight() + 10;
+        int totalMenuHeight = options.length * itemHeight;
+        int startY = (h * 2/3) - (totalMenuHeight / 2);
+
         for (int i = 0; i < options.length; i++) {
-            int itemY = startY + (i * 45);
-            if (y >= itemY - 5 && y <= itemY + 25) {
+            int itemY = startY + (i * itemHeight);
+            if (y >= itemY - 2 && y <= itemY + itemHeight - 6) {
                 if (selectedIndex == i) handleAction();
                 else selectedIndex = i;
                 repaint();
@@ -214,13 +246,22 @@ class StartMenuCanvas extends Canvas {
         }
     }
 
-    protected void keyPressed(int keyCode) {
-        int action = getGameAction(keyCode);
-        if (action == Canvas.UP) selectedIndex = (selectedIndex - 1 + options.length) % options.length;
-        else if (action == Canvas.DOWN) selectedIndex = (selectedIndex + 1) % options.length;
-        else if (action == Canvas.FIRE || keyCode == -5 || keyCode == 10) handleAction();
-        repaint();
+protected void keyPressed(int keyCode) {
+    int action = getGameAction(keyCode);
+    
+    if (action == Canvas.UP || keyCode == Canvas.KEY_NUM2) {
+        selectedIndex = (selectedIndex - 1 + options.length) % options.length;
     }
+    else if (action == Canvas.DOWN || keyCode == Canvas.KEY_NUM8) {
+        selectedIndex = (selectedIndex + 1) % options.length;
+    }
+    else if (
+        action == Canvas.FIRE || keyCode == -5 || keyCode == 10 || keyCode == -7 || keyCode == 53 || keyCode == Canvas.KEY_NUM5) {
+        handleAction();
+    }
+    
+    repaint();
+}
 
     private void handleAction() {
         if (selectedIndex == 0) midlet.startNewGame();
@@ -259,6 +300,7 @@ class VNEngineCanvas extends Canvas implements Runnable {
     
     private final int TEXT_BOX_HEIGHT = 100;
     private final int PADDING = 10;
+    
     private Font font = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_PLAIN, Font.SIZE_SMALL);
 
     public VNEngineCanvas(VisualNovelMIDlet midlet) {
@@ -338,9 +380,22 @@ class VNEngineCanvas extends Canvas implements Runnable {
         } else if (line.startsWith("CHOICE:")) {
             setupChoice(line.substring(7).trim());
             return true;
+        } else if (line.startsWith("ONLYTXT:")) {
+            currentText = line.substring(4).trim();
+            wrapText(currentText);
+            midlet.onlyTextMode = true;
+            return true;
         } else if (line.startsWith("TXT:")) {
             currentText = line.substring(4).trim();
             wrapText(currentText);
+            midlet.onlyTextMode = false;
+            return true;
+        } else if (line.startsWith("WAIT:")) {
+            try {
+            waitTime = Long.parseLong(line.substring(5).trim());
+        } catch (Exception e) {
+            waitTime = 0;
+        }
             return true;
         }
         return false;
@@ -424,22 +479,36 @@ class VNEngineCanvas extends Canvas implements Runnable {
         } catch (Exception e) {}
     }
 
-    public void loadGameState() {
+public void loadGameState() {
         try {
             RecordStore rs = RecordStore.openRecordStore("VNSaveData", false);
             if (rs.getNumRecords() > 0) {
                 byte[] data = rs.getRecord(1);
                 String[] parts = split(new String(data), ';');
+                
                 scriptIndex = Integer.parseInt(parts[0]);
                 currentBgName = parts[1];
                 currentCharName = parts[2];
                 currentSpeaker = parts[3];
+                
                 background = loadImage(currentBgName, true);
                 character = loadImage(currentCharName, false);
+                
                 if (parts.length > 4) playMusic(parts[4]);
+
+                choiceMode = false;
+                menuMode = false;
+                
+                if (scriptIndex > 0) {
+                    scriptIndex--; 
+                }
+                
+                advanceScript(); 
+                
             }
             rs.closeRecordStore();
-        } catch (Exception e) {}
+        } catch (Exception e) {
+        }
         repaint();
     }
 
@@ -524,8 +593,9 @@ class VNEngineCanvas extends Canvas implements Runnable {
         if (currentLine.length() > 0) wrappedLines.addElement(currentLine.toString());
     }
 
-    protected void paint(Graphics g) {
+protected void paint(Graphics g) {
         int w = getWidth(), h = getHeight();
+        
         if (background != null) {
             g.drawImage(background, 0, 0, Graphics.TOP | Graphics.LEFT);
         } else { 
@@ -536,12 +606,20 @@ class VNEngineCanvas extends Canvas implements Runnable {
         if (character != null) renderChar(g, character, charXPosition, charRotation, flipH, flipV, w, h);
         if (character2 != null) renderChar(g, character2, char2XPosition, char2Rotation, flipH2, flipV2, w, h);
         
-        g.setColor(20, 20, 30); g.fillRect(0, h - TEXT_BOX_HEIGHT, w, TEXT_BOX_HEIGHT);
-        g.setColor(150, 150, 200); g.drawRect(2, h - TEXT_BOX_HEIGHT + 2, w - 5, TEXT_BOX_HEIGHT - 5);
+        if (!midlet.onlyTextMode && !menuMode) {
+            g.setColor(20, 20, 30); 
+            g.fillRect(0, h - TEXT_BOX_HEIGHT, w, TEXT_BOX_HEIGHT);
+            g.setColor(150, 150, 200); 
+            g.drawRect(2, h - TEXT_BOX_HEIGHT + 2, w - 5, TEXT_BOX_HEIGHT - 5);
+        }
         
-        if (menuMode) renderMenu(g, w, h);
-        else if (choiceMode) renderChoices(g, w, h);
-        else renderDialogue(g, w, h);
+        if (menuMode) {
+            renderMenu(g, w, h);
+        } else if (choiceMode) {
+            renderChoices(g, w, h);
+        } else {
+            renderDialogue(g, w, h);
+        }
     }
 
     private void renderMenu(Graphics g, int w, int h) {
@@ -573,28 +651,49 @@ class VNEngineCanvas extends Canvas implements Runnable {
     }
 
     private void renderDialogue(Graphics g, int w, int h) {
-        g.setFont(font);
-        int currentY = h - TEXT_BOX_HEIGHT + PADDING;
-        if (currentSpeaker.length() > 0) {
+        Font boldFont = Font.getFont(Font.FACE_SYSTEM, Font.STYLE_BOLD, Font.SIZE_SMALL);
+    Font activeFont = midlet.onlyTextMode ? boldFont : font;
+    g.setFont(activeFont);
+    
+    int currentY = h - TEXT_BOX_HEIGHT + PADDING;
+
+
+    if (currentSpeaker.length() > 0) {
+        if (midlet.onlyTextMode) {
+            g.setColor(255, 255, 255);
+            g.drawString(currentSpeaker + ":", PADDING + 1, currentY + 1, 0);
+            g.setColor(0, 0, 0);
+        } else {
             g.setColor(255, 255, 0);
-            g.drawString(currentSpeaker + ":", PADDING, currentY, 0);
-            currentY += font.getHeight() + 4;
         }
-        g.setColor(255, 255, 255);
-        for (int i = 0; i < wrappedLines.size(); i++) {
-            g.drawString((String)wrappedLines.elementAt(i), PADDING, currentY, 0);
-            currentY += font.getHeight() + 2;
-        }
+        g.drawString(currentSpeaker + ":", PADDING, currentY, 0);
+        currentY += activeFont.getHeight() + 4;
     }
 
-    private void renderChar(Graphics g, Image img, int posX, int rot, boolean fh, boolean fv, int w, int h) {
-        int drawX = w / 2;
-        if (posX == 3) drawX = 0;
-        else if (posX == 4) drawX = w;
-        else if (posX == 1) drawX = w / 4;
-        else if (posX == 2) drawX = (w * 3) / 4;
+    for (int i = 0; i < wrappedLines.size(); i++) {
+        String line = (String) wrappedLines.elementAt(i);
+        
+        if (midlet.onlyTextMode) {
+            g.setColor(255, 255, 255);
+            g.drawString(line, PADDING + 1, currentY + 1, 0);
+            g.setColor(0, 0, 0);
+        } else {
+            g.setColor(255, 255, 255);
+        }
+        
+        g.drawString(line, PADDING, currentY, 0);
+        currentY += activeFont.getHeight() + 2;
+    }
+}
 
-        Sprite s = new Sprite(img);
+    private void renderChar(Graphics g, Image img, int posX, int rot, boolean fh, boolean fv, int w, int h) {
+    int drawX = w / 2;
+    if (posX == 3) drawX = 0;
+    else if (posX == 4) drawX = w;
+    else if (posX == 1) drawX = w / 4;
+    else if (posX == 2) drawX = (w * 3) / 4;
+
+    Sprite s = new Sprite(img);
         int trans = Sprite.TRANS_NONE;
         if (fh && fv) trans = Sprite.TRANS_ROT180;
         else if (fh) trans = Sprite.TRANS_MIRROR;
@@ -604,13 +703,14 @@ class VNEngineCanvas extends Canvas implements Runnable {
         else if (rot == 270) trans = fh ? Sprite.TRANS_MIRROR_ROT270 : Sprite.TRANS_ROT270;
         
         s.setTransform(trans);
-        int sx = drawX;
-        if (posX == 4) sx -= s.getWidth();
-        else if (posX == 0 || posX == 1 || posX == 2) sx -= s.getWidth()/2;
-        s.setPosition(sx, h - TEXT_BOX_HEIGHT - s.getHeight());
-        s.paint(g);
-    }
+    int sx = drawX;
+    if (posX == 4) sx -= s.getWidth();
+    else if (posX == 0 || posX == 1 || posX == 2) sx -= s.getWidth()/2;
 
+    s.setPosition(sx, h - s.getHeight()); 
+    s.paint(g);
+}
+    
     protected void pointerPressed(int x, int y) {
         int w = getWidth(), h = getHeight();
         if (menuMode) {
@@ -640,15 +740,15 @@ class VNEngineCanvas extends Canvas implements Runnable {
 
     protected void keyPressed(int keyCode) {
         int action = getGameAction(keyCode);
-        if (keyCode == -11 || keyCode == -7 || keyCode == 56 || keyCode == 48) { menuMode = !menuMode; repaint(); return; }
+        if (keyCode == -11 || keyCode == -7 || keyCode == 48) { menuMode = !menuMode; repaint(); return; }
         if (menuMode) {
-            if (action == Canvas.UP) selectedMenuIndex = (selectedMenuIndex - 1 + menuOptions.length) % menuOptions.length;
-            else if (action == Canvas.DOWN) selectedMenuIndex = (selectedMenuIndex + 1) % menuOptions.length;
-            else if (action == Canvas.FIRE || keyCode == -5 || keyCode == 10) handleMenuAction();
+            if (action == Canvas.UP || keyCode == 50) selectedMenuIndex = (selectedMenuIndex - 1 + menuOptions.length) % menuOptions.length;
+            else if (action == Canvas.DOWN || keyCode == 56) selectedMenuIndex = (selectedMenuIndex + 1) % menuOptions.length;
+            else if (action == Canvas.FIRE || keyCode == -5 || keyCode == 10 || keyCode == -7 || keyCode == 53 || keyCode == Canvas.KEY_NUM5) handleMenuAction();
         } else if (choiceMode) {
-            if (action == Canvas.UP) selectedChoiceIndex = (selectedChoiceIndex - 1 + choiceTexts.size()) % choiceTexts.size();
-            else if (action == Canvas.DOWN) selectedChoiceIndex = (selectedChoiceIndex + 1) % choiceTexts.size();
-            else if (action == Canvas.FIRE || keyCode == -5 || keyCode == 10) {
+            if (action == Canvas.UP || keyCode == 50) selectedChoiceIndex = (selectedChoiceIndex - 1 + choiceTexts.size()) % choiceTexts.size();
+            else if (action == Canvas.DOWN || keyCode == 56) selectedChoiceIndex = (selectedChoiceIndex + 1) % choiceTexts.size();
+            else if (action == Canvas.FIRE || keyCode == -5 || keyCode == 10 || keyCode == -7 || keyCode == 53 || keyCode == Canvas.KEY_NUM5) {
                 if (selectedChoiceIndex != -1) {
                     String target = (String)choiceTargets.elementAt(selectedChoiceIndex);
                     choiceMode = false; jumpToLabel(target); advanceScript();
@@ -657,7 +757,7 @@ class VNEngineCanvas extends Canvas implements Runnable {
         } else advanceScript();
         repaint();
     }
-
+    
     private void handleMenuAction() {
         switch (selectedMenuIndex) {
             case 0: menuMode = false; break;
@@ -684,16 +784,24 @@ class VNEngineCanvas extends Canvas implements Runnable {
 
     public void stop() { stopMusic(); running = false; }
 
-    public void run() {
-        while (running) {
-            if (!menuMode && (autoMode || waitTime > 0) && !choiceMode) {
+public void run() {
+    while (running) {
+        if (!menuMode && !choiceMode) {
+            if (waitTime > 0) {
                 try {
-                    Thread.sleep(waitTime > 0 ? waitTime : 100);
-                    waitTime = 0; advanceScript();
+                    Thread.sleep(waitTime);
+                    waitTime = 0;
+                    advanceScript();
                 } catch (InterruptedException e) {}
-            } else {
-                try { Thread.sleep(100); } catch (InterruptedException e) {}
+            } else if (autoMode) {
+                try {
+                    Thread.sleep(2000);
+                    advanceScript();
+                } catch (InterruptedException e) {}
             }
         }
+        
+        try { Thread.sleep(50); } catch (InterruptedException e) {}
     }
+}
 }
